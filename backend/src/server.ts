@@ -6,6 +6,8 @@ import dotenv from 'dotenv';
 import { tenantContextMiddleware, TenantRequest } from './middlewares/tenantContext';
 import { WorkflowModel } from './models/workflow';
 import authRoutes from './routes/authRoutes'; // <-- ADD THIS IMPORT
+import cors from 'cors';
+
 
 dotenv.config();
 
@@ -17,11 +19,13 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
+// Mount Authentication Routes <-- ADD THIS LINE
+app.use('/api/auth', authRoutes);
+
 // Apply tenant context security middleware globally to API routes
 app.use('/api', tenantContextMiddleware);
 
-// Mount Authentication Routes <-- ADD THIS LINE
-app.use('/api/auth', authRoutes);
+
 
 // Example workflow creation route leveraging tenant context isolation
 app.post('/api/workflows', async (req: TenantRequest, res: Response) => {
