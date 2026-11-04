@@ -1,4 +1,3 @@
-// frontend/src/pages/Dashboard.tsx
 import React, { useState, useCallback } from 'react';
 import ReactFlow, {
   MiniMap,
@@ -42,14 +41,51 @@ export default function Dashboard() {
   const [workflowName, setWorkflowName] = useState('My First Workflow');
   const [savedWorkflowId, setSavedWorkflowId] = useState<string | null>(null);
   const [executionTrace, setExecutionTrace] = useState<any[]>([]);
+
+  // State for Node Configuration Sidebar
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [nodeLabelInput, setNodeLabelInput] = useState('');
+  const [nodePayloadInput, setNodePayloadInput] = useState(''); // NEW: Custom payload state
+
   const navigate = useNavigate();
+
+  // Handle clicking a node to open its configuration panel and populate values
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    setSelectedNodeId(node.id);
+    setNodeLabelInput(node.data?.label || '');
+    setNodePayloadInput(node.data?.payload || '{\n  "key": "value"\n}');
+  }, []);
+
+  // Handle saving both label and custom JSON payload to the selected node
+  const handleUpdateNodeConfig = () => {
+    if (!selectedNodeId) return;
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === selectedNodeId) {
+          return {
+            ...node,
+            data: { 
+              ...node.data, 
+              label: nodeLabelInput,
+              payload: nodePayloadInput 
+            }
+          };
+        }
+        return node;
+      })
+    );
+    alert('Node configuration updated with custom payload!');
+  };
 
   const onConnect = useCallback(
     (params: Connection | Edge) => {
+      // Check if connecting these nodes introduces a cycle/loop
       if (hasCycle(edges, params)) {
         alert('⚠️ Invalid Connection: This link creates an infinite loop. Workflows must be Directed Acyclic Graphs (DAGs)!');
         return; 
       }
+
+      // If valid, add the edge
       setEdges((eds) => addEdge({ ...params, animated: true }, eds));
     },
     [edges, setEdges]
@@ -113,8 +149,7 @@ export default function Dashboard() {
       const data = await response.json();
       if (response.ok) {
         setExecutionTrace(data.trace);
-        alert(`Workflow Executed Successfully! Total Steps: ${data.totalSteps}. Check console or bottom panel for trace.`);
-        console.log('Execution Trace:', data.trace);
+        alert(`Workflow Executed Successfully! Total Steps: ${data.totalSteps}`);
       } else {
         alert(data.error || 'Execution failed');
       }
@@ -178,8 +213,63 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Main Visual Canvas & Execution Trace Area */}
-      <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
+      {/* Main Layout Area (Canvas + Sidebars) */}
+      <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden' }}>
+        
+        {/* Node Configuration Panel (Left Sidebar) */}
+        {selectedNodeId && (
+          <div style={{
+            width: '300px',
+            backgroundColor: '#ffffff',
+            borderRight: '1px solid #e0e0e0',
+            padding: '16px',
+            boxShadow: '2px 0 5px rgba(0,0,0,0.05)',
+            zIndex: 10,
+            overflowY: 'auto'
+          }}>
+            <h3 style={{ fontSize: '15px', marginTop: 0, color: '#333', borderBottom: '2px solid #007bff', paddingBottom: '8px' }}>
+              ⚙️ Configure Node
+            </h3>
+            <div style={{ marginBottom: '12px', fontSize: '12px', color: '#666' }}>
+              Node ID: <b>{selectedNodeId}</b>
+            </div>
+
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', marginBottom: '4px' }}>
+              Node Label / Task Name
+            </label>
+            <input
+              type="text"
+              value={nodeLabelInput}
+              onChange={(e) => setNodeLabelInput(e.target.value)}
+              style={{ width: '100%', padding: '6px 8px', fontSize: '13px', border: '1px solid #ccc', borderRadius: '4px', marginBottom: '12px' }}
+            />
+
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', marginBottom: '4px' }}>
+              Custom Payload / Endpoint (JSON)
+            </label>
+            <textarea
+              rows={5}
+              value={nodePayloadInput}
+              onChange={(e) => setNodePayloadInput(e.target.value)}
+              style={{ width: '100%', padding: '6px 8px', fontSize: '12px', fontFamily: 'monospace', border: '1px solid #ccc', borderRadius: '4px', marginBottom: '12px' }}
+            />
+
+            <button
+              onClick={handleUpdateNodeConfig}
+              style={{ width: '100%', padding: '8px', backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '500', fontSize: '13px' }}
+            >
+              Save Configuration
+            </button>
+            <button
+              onClick={() => setSelectedNodeId(null)}
+              style={{ width: '100%', padding: '6px', backgroundColor: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '8px', fontSize: '12px' }}
+            >
+              Close Panel
+            </button>
+          </div>
+        )}
+
+        {/* Main Visual Canvas Area */}
         <div style={{ flex: 1, height: '100%', backgroundColor: '#f8f9fa' }}>
           <ReactFlow
             nodes={nodes}
@@ -187,6 +277,7 @@ export default function Dashboard() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onNodeClick={onNodeClick}
             fitView
           >
             <Controls />
@@ -195,7 +286,7 @@ export default function Dashboard() {
           </ReactFlow>
         </div>
 
-        {/* Execution Trace Sidebar (Displays when ran) */}
+        {/* Execution Trace Sidebar (Right Panel) */}
         {executionTrace.length > 0 && (
           <div style={{
             width: '320px',
@@ -203,7 +294,8 @@ export default function Dashboard() {
             borderLeft: '1px solid #e0e0e0',
             padding: '16px',
             overflowY: 'auto',
-            boxShadow: '-2px 0 5px rgba(0,0,0,0.05)'
+            boxShadow: '-2px 0 5px rgba(0,0,0,0.05)',
+            zIndex: 10
           }}>
             <h3 style={{ fontSize: '16px', marginTop: 0, color: '#333', borderBottom: '2px solid #17a2b8', paddingBottom: '8px' }}>
               ⚡ Execution Trace
@@ -224,6 +316,7 @@ export default function Dashboard() {
             ))}
           </div>
         )}
+
       </div>
     </div>
   );
