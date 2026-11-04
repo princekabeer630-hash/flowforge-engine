@@ -1,13 +1,11 @@
-import express from 'express';
+import express, { Response } from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
-import { tenantContextMiddleware, TenantRequest } from './middlewares/tenantContext';
-import { WorkflowModel } from './models/workflow';
-import authRoutes from './routes/authRoutes'; // <-- ADD THIS IMPORT
-import cors from 'cors';
-
+import { tenantContextMiddleware } from './middlewares/tenantContext';
+import authRoutes from './routes/authRoutes';
+import workflowRoutes from './routes/workflowRoutes';
 
 dotenv.config();
 
@@ -19,30 +17,14 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
-// Mount Authentication Routes <-- ADD THIS LINE
+// 1. Mount Public Authentication Routes (Bypasses tenant check if needed, or place below tenant middleware depending on your auth design)
 app.use('/api/auth', authRoutes);
 
-// Apply tenant context security middleware globally to API routes
+// 2. Apply tenant context security middleware globally to API routes
 app.use('/api', tenantContextMiddleware);
 
-
-
-// Example workflow creation route leveraging tenant context isolation
-app.post('/api/workflows', async (req: TenantRequest, res: Response) => {
-  try {
-    const { name, nodes, edges } = req.body;
-    const workflow = new WorkflowModel({
-      tenantId: req.tenantId, // Isolated securely via tenant context middleware
-      name,
-      nodes,
-      edges
-    });
-    const savedWorkflow = await workflow.save();
-    res.status(201).json({ success: true, data: savedWorkflow });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+// 3. Mount Protected Workflow Routes (Handles both workflow saving and execution)
+app.use('/api/workflows', workflowRoutes);
 
 // Database connection & Server start
 mongoose.connect(MONGO_URI)
