@@ -1,3 +1,4 @@
+import { initWorkflowChangeStream } from './services/changeStreamService';
 import express, { Response } from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -14,13 +15,16 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-// Initialize Socket.io with CORS enabled for frontend communication
+// Initialize Socket.io once with CORS enabled for frontend communication
 const io = new Server(server, {
   cors: {
     origin: '*',
     methods: ['GET', 'POST']
   }
 });
+
+// Initialize MongoDB Change Stream watcher
+initWorkflowChangeStream(io);
 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/flowforge';

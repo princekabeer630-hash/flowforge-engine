@@ -15,6 +15,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { useNavigate } from 'react-router-dom';
 import { hasCycle } from '../utils/dagValidator';
+import { AnalyticsDashboard } from '../components/AnalyticsDashboard';
 
 const initialNodes: Node[] = [
   {
@@ -78,7 +79,7 @@ export default function Dashboard() {
     alert('Node configuration updated with custom payload!');
   };
 
-  // Connect to backend WebSocket on mount and handle live visual status updates (Success & Failure)
+  // Connect to backend WebSocket on mount and handle live visual & database updates
   useEffect(() => {
     const socket = io('http://localhost:5000');
 
@@ -95,7 +96,7 @@ export default function Dashboard() {
               ...node,
               style: {
                 ...node.style,
-                background: isFailed ? '#f8d7da' : '#d4edda', // Soft Red for failure, Green for success
+                background: isFailed ? '#f8d7da' : '#d4edda',
                 border: isFailed ? '2px solid #dc3545' : '2px solid #28a745',
                 boxShadow: isFailed 
                   ? '0 0 12px rgba(220, 53, 69, 0.4)' 
@@ -110,6 +111,14 @@ export default function Dashboard() {
 
     socket.on('workflow_execution_completed', (data) => {
       console.log(data.message);
+    });
+
+    socket.on('workflow_db_insert', (data) => {
+      console.log(data.message, data.workflow);
+    });
+
+    socket.on('workflow_db_update', (data) => {
+      console.log(data.message, data.updatedFields);
     });
 
     return () => {
@@ -174,9 +183,8 @@ export default function Dashboard() {
       return;
     }
 
-    setExecutionTrace([]); // Clear previous trace logs
+    setExecutionTrace([]);
     
-    // Reset all nodes to default styling before running
     setNodes((nds) =>
       nds.map((node) => ({
         ...node,
@@ -261,6 +269,9 @@ export default function Dashboard() {
           </button>
         </div>
       </header>
+
+      {/* Analytics Dashboard Header View */}
+      <AnalyticsDashboard />
 
       {/* Main Layout Area (Canvas + Sidebars) */}
       <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden' }}>

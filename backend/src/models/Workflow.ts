@@ -39,3 +39,22 @@ const WorkflowSchema: Schema = new Schema(
 WorkflowSchema.index({ tenantId: 1, name: 1 });
 
 export const WorkflowModel = mongoose.model<IWorkflow>('Workflow', WorkflowSchema);
+
+// Dead-Letter Queue (DLQ) Schema for permanently failed tasks after retries
+const DLQSchema = new Schema(
+  {
+    tenantId: { type: String, required: true, index: true },
+    workflowId: { type: Schema.Types.ObjectId, ref: 'Workflow', required: true },
+    nodeId: { type: String, required: true },
+    nodeLabel: { type: String },
+    payload: { type: Object },
+    error: { type: String, required: true },
+    attemptsMade: { type: Number, required: true },
+    failedAt: { type: Date, default: Date.now }
+  },
+  { timestamps: true }
+);
+
+DLQSchema.index({ tenantId: 1, workflowId: 1 });
+
+export const DLQModel = mongoose.model('DeadLetterQueue', DLQSchema);
