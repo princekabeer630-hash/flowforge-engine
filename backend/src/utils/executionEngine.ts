@@ -1,5 +1,3 @@
-// backend/src/utils/executionEngine.ts
-
 export interface WorkflowNode {
   id: string;
   data: { label: string; payload?: string; [key: string]: any };
@@ -20,7 +18,6 @@ export interface ExecutionStepResult {
   timestamp: string;
 }
 
-// Topological sort to order DAG nodes for sequential execution
 export function getExecutionOrder(nodes: WorkflowNode[], edges: WorkflowEdge[]): WorkflowNode[] {
   const adjList = new Map<string, string[]>();
   const inDegree = new Map<string, number>();
@@ -62,8 +59,7 @@ export function getExecutionOrder(nodes: WorkflowNode[], edges: WorkflowEdge[]):
   return sortedNodeIds.map((id) => nodeMap.get(id)!).filter(Boolean);
 }
 
-// Helper to safely parse custom JSON node configurations
-function tryParseJSON(value: string) {
+export function tryParseJSON(value: string) {
   try {
     return JSON.parse(value);
   } catch {
@@ -71,29 +67,33 @@ function tryParseJSON(value: string) {
   }
 }
 
-// Run the state-machine workflow simulator with custom payload processing
 export async function executeWorkflowState(nodes: WorkflowNode[], edges: WorkflowEdge[]): Promise<ExecutionStepResult[]> {
   const orderedNodes = getExecutionOrder(nodes, edges);
   const executionTrace: ExecutionStepResult[] = [];
 
   for (const node of orderedNodes) {
-    // Extract and parse the custom user payload defined in the frontend configuration sidebar
-    const customPayload = node.data?.payload ? tryParseJSON(node.data.payload) : { defaultPayload: true };
+    const customPayload = node.data?.payload ? tryParseJSON(node.data.payload) : {};
+    
+    // Check if the node is explicitly configured to fail for testing error handling
+    const isSimulatedFailure = customPayload.fail === true || customPayload.shouldFail === true;
 
     const stepResult: ExecutionStepResult = {
       nodeId: node.id,
       label: node.data?.label || `Node ${node.id}`,
-      status: 'SUCCESS',
-      output: { 
-        executedAt: new Date().toISOString(), 
-        processedPayload: customPayload,
-        executionStatus: 'Completed successfully' 
-      },
+      status: isSimulatedFailure ? 'FAILED' : 'SUCCESS',
+      output: isSimulatedFailure 
+        ? { error: 'Task execution failed due to node configuration error', payload: customPayload }
+        : { executedAt: new Date().toISOString(), processedPayload: customPayload },
       timestamp: new Date().toISOString()
     };
 
     executionTrace.push(stepResult);
-    await new Promise((resolve) => setTimeout(resolve, 300)); // Simulate realistic async task processing delay
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // If a node fails, we can optionally halt execution
+    if (isSimulatedFailure) {
+      break;
+    }
   }
 
   return executionTrace;

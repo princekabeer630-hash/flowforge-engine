@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import { io } from 'socket.io-client';
+import React, { useState, useCallback, useEffect } from 'react';
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -45,7 +46,7 @@ export default function Dashboard() {
   // State for Node Configuration Sidebar
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [nodeLabelInput, setNodeLabelInput] = useState('');
-  const [nodePayloadInput, setNodePayloadInput] = useState(''); // NEW: Custom payload state
+  const [nodePayloadInput, setNodePayloadInput] = useState('');
 
   const navigate = useNavigate();
 
@@ -77,15 +78,51 @@ export default function Dashboard() {
     alert('Node configuration updated with custom payload!');
   };
 
+  // Connect to backend WebSocket on mount and handle live visual status updates (Success & Failure)
+  useEffect(() => {
+    const socket = io('http://localhost:5000');
+
+    socket.on('workflow_execution_step', (data) => {
+      setExecutionTrace((prev) => [...prev, data.step]);
+
+      const isFailed = data.step.status === 'FAILED';
+
+      // Dynamically style the node based on SUCCESS or FAILED execution state
+      setNodes((nds) =>
+        nds.map((node) => {
+          if (String(node.id) === String(data.step.nodeId)) {
+            return {
+              ...node,
+              style: {
+                ...node.style,
+                background: isFailed ? '#f8d7da' : '#d4edda', // Soft Red for failure, Green for success
+                border: isFailed ? '2px solid #dc3545' : '2px solid #28a745',
+                boxShadow: isFailed 
+                  ? '0 0 12px rgba(220, 53, 69, 0.4)' 
+                  : '0 0 12px rgba(40, 167, 69, 0.4)'
+              }
+            };
+          }
+          return node;
+        })
+      );
+    });
+
+    socket.on('workflow_execution_completed', (data) => {
+      console.log(data.message);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [setNodes]);
+
   const onConnect = useCallback(
     (params: Connection | Edge) => {
-      // Check if connecting these nodes introduces a cycle/loop
       if (hasCycle(edges, params)) {
         alert('⚠️ Invalid Connection: This link creates an infinite loop. Workflows must be Directed Acyclic Graphs (DAGs)!');
         return; 
       }
-
-      // If valid, add the edge
       setEdges((eds) => addEdge({ ...params, animated: true }, eds));
     },
     [edges, setEdges]
@@ -137,6 +174,21 @@ export default function Dashboard() {
       return;
     }
 
+    setExecutionTrace([]); // Clear previous trace logs
+    
+    // Reset all nodes to default styling before running
+    setNodes((nds) =>
+      nds.map((node) => ({
+        ...node,
+        style: {
+          ...node.style,
+          background: '#ffffff',
+          border: '1px solid #ccc',
+          boxShadow: 'none'
+        }
+      }))
+    );
+
     const token = localStorage.getItem('token');
     try {
       const response = await fetch(`http://localhost:5000/api/workflows/${savedWorkflowId}/execute`, {
@@ -146,12 +198,9 @@ export default function Dashboard() {
           'x-tenant-id': 'default-tenant'
         }
       });
-      const data = await response.json();
-      if (response.ok) {
-        setExecutionTrace(data.trace);
-        alert(`Workflow Executed Successfully! Total Steps: ${data.totalSteps}`);
-      } else {
-        alert(data.error || 'Execution failed');
+      if (!response.ok) {
+        const data = await response.json();
+        alert(data.error || 'Execution failed to start');
       }
     } catch (err) {
       console.error(err);
@@ -300,20 +349,25 @@ export default function Dashboard() {
             <h3 style={{ fontSize: '16px', marginTop: 0, color: '#333', borderBottom: '2px solid #17a2b8', paddingBottom: '8px' }}>
               ⚡ Execution Trace
             </h3>
-            {executionTrace.map((step, idx) => (
-              <div key={idx} style={{
-                marginBottom: '12px',
-                padding: '10px',
-                borderRadius: '6px',
-                backgroundColor: '#f1f8f5',
-                border: '1px solid #28a745',
-                fontSize: '13px'
-              }}>
-                <div style={{ fontWeight: 'bold', color: '#28a745' }}>✓ {step.label}</div>
-                <div style={{ color: '#666', fontSize: '11px', marginTop: '4px' }}>Status: {step.status}</div>
-                <div style={{ color: '#999', fontSize: '10px' }}>{new Date(step.timestamp).toLocaleTimeString()}</div>
-              </div>
-            ))}
+            {executionTrace.map((step, idx) => {
+              const isFailed = step.status === 'FAILED';
+              return (
+                <div key={idx} style={{
+                  marginBottom: '12px',
+                  padding: '10px',
+                  borderRadius: '6px',
+                  backgroundColor: isFailed ? '#f8d7da' : '#f1f8f5',
+                  border: isFailed ? '1px solid #dc3545' : '1px solid #28a745',
+                  fontSize: '13px'
+                }}>
+                  <div style={{ fontWeight: 'bold', color: isFailed ? '#dc3545' : '#28a745' }}>
+                    {isFailed ? '✗' : '✓'} {step.label}
+                  </div>
+                  <div style={{ color: '#666', fontSize: '11px', marginTop: '4px' }}>Status: {step.status}</div>
+                  <div style={{ color: '#999', fontSize: '10px' }}>{new Date(step.timestamp).toLocaleTimeString()}</div>
+                </div>
+              );
+            })}
           </div>
         )}
 
