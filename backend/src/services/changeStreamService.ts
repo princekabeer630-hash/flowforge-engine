@@ -5,7 +5,7 @@ export function initWorkflowChangeStream(io: any) {
     // Open a MongoDB Change Stream on the workflows collection
     const changeStream = WorkflowModel.watch();
 
-    changeStream.on('change', (change) => {
+    changeStream.on('change', (change: any) => {
       console.log('🔄 MongoDB Change Stream event detected! Type:', change.operationType);
       console.log('Full change object:', JSON.stringify(change, null, 2));
 
@@ -24,7 +24,7 @@ export function initWorkflowChangeStream(io: any) {
       }
     });
 
-    changeStream.on('error', (error) => {
+    changeStream.on('error', (error: any) => {
       console.error('MongoDB Change Stream error:', error);
     });
 

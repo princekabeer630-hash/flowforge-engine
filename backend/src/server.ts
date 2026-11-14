@@ -1,3 +1,8 @@
+import crypto from 'crypto';
+if (!globalThis.crypto) {
+  (globalThis as any).crypto = crypto;
+}
+
 import { initWorkflowChangeStream } from './services/changeStreamService';
 import express, { Response } from 'express';
 import http from 'http';

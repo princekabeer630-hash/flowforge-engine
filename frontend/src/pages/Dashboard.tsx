@@ -16,6 +16,7 @@ import 'reactflow/dist/style.css';
 import { useNavigate } from 'react-router-dom';
 import { hasCycle } from '../utils/dagValidator';
 import { AnalyticsDashboard } from '../components/AnalyticsDashboard';
+import API from '../services/api';
 
 const initialNodes: Node[] = [
   {
@@ -151,29 +152,22 @@ export default function Dashboard() {
   const handleSaveWorkflow = async () => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:5000/api/workflows', {
-        method: 'POST',
+      const response = await API.post('/api/workflows', {
+        name: workflowName,
+        nodes,
+        edges
+      }, {
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'x-tenant-id': 'default-tenant'
-        },
-        body: JSON.stringify({
-          name: workflowName,
-          nodes,
-          edges
-        })
+          'Authorization': `Bearer ${token}`
+        }
       });
-      const data = await response.json();
-      if (response.ok) {
-        setSavedWorkflowId(data.workflow?._id || data.data?._id);
-        alert('Workflow saved successfully to MongoDB!');
-      } else {
-        alert(data.error || 'Failed to save workflow');
-      }
-    } catch (err) {
+      
+      const data = response.data;
+      setSavedWorkflowId(data.workflow?._id || data.data?._id);
+      alert('Workflow saved successfully to MongoDB!');
+    } catch (err: any) {
       console.error(err);
-      alert('Error connecting to backend server.');
+      alert(err.response?.data?.error || 'Error connecting to backend server.');
     }
   };
 
@@ -199,20 +193,14 @@ export default function Dashboard() {
 
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:5000/api/workflows/${savedWorkflowId}/execute`, {
-        method: 'POST',
+      await API.post(`/api/workflows/${savedWorkflowId}/execute`, {}, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'x-tenant-id': 'default-tenant'
+          'Authorization': `Bearer ${token}`
         }
       });
-      if (!response.ok) {
-        const data = await response.json();
-        alert(data.error || 'Execution failed to start');
-      }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Error connecting to backend server during execution.');
+      alert(err.response?.data?.error || 'Error connecting to backend server during execution.');
     }
   };
 

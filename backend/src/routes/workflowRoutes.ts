@@ -106,7 +106,7 @@ router.post('/:id/execute', async (req: any, res: Response) => {
       workflowName: workflow.name
     });
 
-    const orderedNodes = getExecutionOrder(workflow.nodes, workflow.edges);
+    const orderedNodes = getExecutionOrder(workflow.nodes as any, workflow.edges);
 
     // Stream each step live over WebSockets with sandbox execution, exponential backoff, and DLQ fallback
     for (const node of orderedNodes) {
